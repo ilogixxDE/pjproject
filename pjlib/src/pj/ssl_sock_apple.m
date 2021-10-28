@@ -987,8 +987,12 @@ static pj_status_t network_create_params(pj_ssl_sock_t * ssock,
 	    	ssock->param.server_name.ptr);
 	}
 	
+	/* Enabling this may result the verify block to be invoked
+	 * more than once.
+	 */
 	sec_protocol_options_set_tls_renegotiation_enabled(sec_options,
-							   true);
+							   false);
+
 	/* This must be disabled, otherwise server may think this is
 	 * a resumption of a previously closed connection, and our
 	 * verify block may never be invoked!
@@ -1021,6 +1025,11 @@ static pj_status_t network_create_params(pj_ssl_sock_t * ssock,
 	    pj_status_t status;
 	    bool result = true;
 
+    	    if (assock->trust) {
+    	    	/* This block has been called before, so we just return. */
+    	    	complete(true);
+    	    }
+    	    
     	    assock->trust = trust_ref? sec_trust_copy_ref(trust_ref): nil;
 
 	    assock->cipher =
@@ -1151,7 +1160,7 @@ static pj_status_t network_setup_connection(pj_ssl_sock_t *ssock,
     	    pj_bzero(queue_th_desc, sizeof(pj_thread_desc));
     	    pj_thread_register("sslq", queue_th_desc, &queue_th);
         }
-        PJ_LOG(3, (THIS_FILE, "SSL state change %p %d", assock, state));
+        PJ_LOG(3, (THIS_FILE, "SSL state change %d %p", state, assock));
 #endif
 
 	if (error && state != nw_connection_state_cancelled) {
