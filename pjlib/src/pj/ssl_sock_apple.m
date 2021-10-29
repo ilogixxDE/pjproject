@@ -1022,10 +1022,10 @@ static pj_status_t network_create_params(pj_ssl_sock_t * ssock,
 	    pj_status_t status;
 	    bool result = true;
 
-    	    if (ssock->is_closing)
+    	    if (ssock->is_closing || !trust_ref)
     	    	complete(false);
     	    
-    	    assock->trust = trust_ref? sec_trust_copy_ref(trust_ref): nil;
+    	    assock->trust = sec_trust_copy_ref(trust_ref);
 
 	    assock->cipher =
 	      sec_protocol_metadata_get_negotiated_tls_ciphersuite(metadata);
