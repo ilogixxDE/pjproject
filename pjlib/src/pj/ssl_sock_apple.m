@@ -987,9 +987,6 @@ static pj_status_t network_create_params(pj_ssl_sock_t * ssock,
 	    	ssock->param.server_name.ptr);
 	}
 	
-	/* Enabling this may result the verify block to be invoked
-	 * more than once.
-	 */
 	sec_protocol_options_set_tls_renegotiation_enabled(sec_options,
 							   false);
 
@@ -1025,27 +1022,13 @@ static pj_status_t network_create_params(pj_ssl_sock_t * ssock,
 	    pj_status_t status;
 	    bool result = true;
 
-    	    if (assock->trust) {
-    	    	/* This block has been called before, so we just return. */
-    	    	complete(true);
-    	    }
+    	    if (ssock->is_closing)
+    	    	complete(false);
     	    
     	    assock->trust = trust_ref? sec_trust_copy_ref(trust_ref): nil;
 
 	    assock->cipher =
 	      sec_protocol_metadata_get_negotiated_tls_ciphersuite(metadata);
-
-	    /* For client, call on_connect_complete() callback first. */
-	    if (!ssock->is_server) {
-	    	if (!assock->connection)
-	    	    complete(false);
-
-	    	event.type = EVENT_CONNECT;
-	    	event.body.connect_ev.status = PJ_SUCCESS;
-	    	status = event_manager_post_event(ssock, &event, PJ_FALSE);
-	    	if (status == PJ_EGONE)
-	    	    complete(false);
-	    }
 
 	    event.type = EVENT_VERIFY_CERT;
 	    status = event_manager_post_event(ssock, &event, PJ_FALSE);
@@ -1173,7 +1156,21 @@ static pj_status_t network_setup_connection(pj_ssl_sock_t *ssock,
             call_cb = PJ_TRUE;	
 	}
 
-	if (state == nw_connection_state_ready) {
+	if (state == nw_connection_state_preparing) {
+	    /* For client, call on_connect_complete() callback. */
+	    if (!ssock->is_server) {
+	        event_t event;
+
+	    	if (!assock->connection)
+	    	    return;
+
+	    	event.type = EVENT_CONNECT;
+	    	event.body.connect_ev.status = PJ_SUCCESS;
+	    	status = event_manager_post_event(ssock, &event, PJ_FALSE);
+	    	if (status == PJ_EGONE)
+	    	    return;
+	    }
+	} else if (state == nw_connection_state_ready) {
 	    if (ssock->is_server) {
     		nw_protocol_definition_t tls_def;
     		nw_protocol_metadata_t prot_meta;
